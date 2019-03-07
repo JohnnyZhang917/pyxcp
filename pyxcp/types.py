@@ -28,7 +28,7 @@ import enum
 import construct
 
 from construct import (
-    Struct, Enum, Padding, Int8ul, GreedyBytes, Byte, Int16ul, Int32ul,
+    Struct, Enum, Padding, Int8ul, GreedyBytes, Byte, Int16ul, Int32ul, Int16ub, Int32ub,
     BitStruct, BitsInteger, Flag, If, this)
 
 if construct.version < (2, 8):
@@ -314,345 +314,362 @@ CommModeBasic = BitStruct(
     "byteOrder" / ByteOrder
 )
 
-ConnectResponse = Struct(
+ConnectResponsePartial = Struct(
     "resource" / ResourceType,
     "commModeBasic" / CommModeBasic,
     "maxCto" / Int8ul,
-    "maxDto" / Int16ul,
-    "protocolLayerVersion" / Int8ul,
-    "transportLayerVersion" / Int8ul
 )
 
-GetVersionResponse = Struct(
-    Padding(1),
-    "protocolMajor" / Int8ul,
-    "protocolMinor" / Int8ul,
-    "transportMajor" / Int8ul,
-    "transportMinor" / Int8ul,
-)
 
-SessionStatus = BitStruct(
-    "resume" / Flag,
-    "daqRunning" / Flag,
-    Padding(2),
-    "clearDaqRequest" / Flag,
-    "storeDaqRequest" / Flag,
-    Padding(1),
-    "storeCalRequest" / Flag,
-)
+class Responses:
+    """
+    """
 
-GetStatusResponse = Struct(
-    "sessionStatus" / SessionStatus,
-    "resourceProtectionStatus" / ResourceType,
-    Padding(1),
-    "sessionConfiguration" / Int16ul,
-)
+    def __init__(self, byteOrder):
+        Int8 = Int8ul
+        Int16 = Int16ul if byteOrder == ByteOrder.INTEL else Int16ub
+        Int32 = Int32ul if byteOrder == ByteOrder.INTEL else Int32ub
 
-CommModeOptional = BitStruct(
-    Padding(6),
-    "interleavedMode" / Flag,
-    "masterBlockMode" / Flag,
-)
+        self.SessionStatus = BitStruct(
+            "resume" / Flag,
+            "daqRunning" / Flag,
+            Padding(2),
+            "clearDaqRequest" / Flag,
+            "storeDaqRequest" / Flag,
+            Padding(1),
+            "storeCalRequest" / Flag,
+        )
 
-GetCommModeInfoResponse = Struct(
-    Padding(1),
-    "commModeOptional" / CommModeOptional,
-    Padding(1),
-    "maxbs" / Int8ul,
-    "minSt" / Int8ul,
-    "queueSize" / Int8ul,
-    "xcpDriverVersionNumber" / Int8ul,
-)
+        self.CommModeOptional = BitStruct(
+            Padding(6),
+            "interleavedMode" / Flag,
+            "masterBlockMode" / Flag,
+        )
+        self.ConnectResponse = Struct(
+            "resource" / ResourceType,
+            "commModeBasic" / CommModeBasic,
+            "maxCto" / Int8,
+            "maxDto" / Int16,
+            "protocolLayerVersion" / Int8,
+            "transportLayerVersion" / Int8
+        )
 
-GetIDResponse = Struct(
-    "mode" / Int8ul,
-    Padding(2),
-    "length" / Int32ul,
-    "identification" / If(this.mode == 1, Byte[this.length])
-)
+        self.GetVersionResponse = Struct(
+            Padding(1),
+            "protocolMajor" / Int8,
+            "protocolMinor" / Int8,
+            "transportMajor" / Int8,
+            "transportMinor" / Int8,
+        )
 
-GetSeedResponse = Struct(
-    "length" / Int8ul,
-    "seed" / If(this.length > 0, Byte[this.length])
-)
 
-SetRequestMode = BitStruct(
-    Padding(4),
-    "clearDaqReq" / Flag,
-    "storeDaqReq" / Flag,
-    Padding(1),
-    "storeCalReq" / Flag,
-)
+        self.GetStatusResponse = Struct(
+            "sessionStatus" / self.SessionStatus,
+            "resourceProtectionStatus" / ResourceType,
+            Padding(1),
+            "sessionConfiguration" / Int16,
+        )
 
-BuildChecksumResponse = Struct(
-    "checksumType" / Enum(
-        Int8ul,
-        XCP_NONE=0x00,
-        XCP_ADD_11=0x01,
-        XCP_ADD_12=0x02,
-        XCP_ADD_14=0x03,
-        XCP_ADD_22=0x04,
-        XCP_ADD_24=0x05,
-        XCP_ADD_44=0x06,
-        XCP_CRC_16=0x07,
-        XCP_CRC_16_CITT=0x08,
-        XCP_CRC_32=0x09,
-        XCP_USER_DEFINED=0xFF,
-    ),
-    Padding(2),
-    "checksum" / Int32ul,
-)
 
-SetCalPageMode = BitStruct(
-    "all" / Flag,
-    Padding(5),
-    "xcp" / Flag,
-    "ecu" / Flag,
-)
+        self.GetCommModeInfoResponse = Struct(
+            Padding(1),
+            "commModeOptional" / self.CommModeOptional,
+            Padding(1),
+            "maxbs" / Int8,
+            "minSt" / Int8,
+            "queueSize" / Int8,
+            "xcpDriverVersionNumber" / Int8,
+        )
 
-GetPagProcessorInfoResponse = Struct(
-    "maxSegments" / Int8ul,
-    "pagProperties" / Int8ul,
-)
+        self.GetIDResponse = Struct(
+            "mode" / Int8,
+            Padding(2),
+            "length" / Int32,
+            "identification" / If(this.mode == 1, Byte[this.length])
+        )
 
-GetSegmentInfoMode0Response = Struct(
-    Padding(3),
-    "basicInfo" / Int32ul,
-)
+        self.GetSeedResponse = Struct(
+            "length" / Int8,
+            "seed" / If(this.length > 0, Byte[this.length])
+        )
 
-GetSegmentInfoMode1Response = Struct(
-    "maxPages" / Int8ul,
-    "addressExtension" / Int8ul,
-    "maxMapping" / Int8ul,
-    "compressionMethod" / Int8ul,
-    "encryptionMethod" / Int8ul,
-)
+        self.SetRequestMode = BitStruct(
+            Padding(4),
+            "clearDaqReq" / Flag,
+            "storeDaqReq" / Flag,
+            Padding(1),
+            "storeCalReq" / Flag,
+        )
 
-GetSegmentInfoMode2Response = Struct(
-    Padding(3),
-    "mappingInfo" / Int32ul,
-)
+        self.BuildChecksumResponse = Struct(
+            "checksumType" / Enum(
+                Int8,
+                XCP_NONE=0x00,
+                XCP_ADD_11=0x01,
+                XCP_ADD_12=0x02,
+                XCP_ADD_14=0x03,
+                XCP_ADD_22=0x04,
+                XCP_ADD_24=0x05,
+                XCP_ADD_44=0x06,
+                XCP_CRC_16=0x07,
+                XCP_CRC_16_CITT=0x08,
+                XCP_CRC_32=0x09,
+                XCP_USER_DEFINED=0xFF,
+            ),
+            Padding(2),
+            "checksum" / Int32,
+        )
 
-PageProperties = BitStruct(
-    Padding(2),
-    "xcpWriteAccessWithEcu" / Flag,
-    "xcpWriteAccessWithoutEcu" / Flag,
-    "xcpReadAccessWithEcu" / Flag,
-    "xcpReadAccessWithoutEcu" / Flag,
-    "ecuAccessWithXcp" / Flag,
-    "ecuAccessWithoutXcp" / Flag,
-)
+        self.SetCalPageMode = BitStruct(
+            "all" / Flag,
+            Padding(5),
+            "xcp" / Flag,
+            "ecu" / Flag,
+        )
 
-DaqProperties = BitStruct(
-    "overloadEvent" / Flag,
-    "overloadMsb" / Flag,
-    "pidOffSupported" / Flag,
-    "timestampSupported" / Flag,
-    "bitStimSupported" / Flag,
-    "resumeSupported" / Flag,
-    "prescalerSupported" / Flag,
-    "daqConfigType" / Flag,
-)
+        self.GetPagProcessorInfoResponse = Struct(
+            "maxSegments" / Int8,
+            "pagProperties" / Int8,
+        )
 
-GetDaqProcessorInfoResponse = Struct(
-    "daqProperties" / DaqProperties,
-    "maxDaq" / Int16ul,
-    "maxEventChannel" / Int16ul,
-    "minDaq" / Int8ul,
-    "daqKeyByte" / BitStruct(
-        "Identification_Field" / Enum(
-            BitsInteger(2),
-            IDF_ABS_ODT_NUMBER=0b00,
-            IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_BYTE=0b01,
-            IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_WORD=0b10,
-            IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_WORD_ALIGNED=0b11,
-        ),
-        "Address_Extension" / Enum(
-            BitsInteger(2),
-            AE_DIFFERENT_WITHIN_ODT=0b00,
-            AE_SAME_FOR_ALL_ODT=0b01,
-            _NOT_ALLOWED=0b10,
-            AE_SAME_FOR_ALL_DAQ=0b11,
-        ),
-        "Optimisation_Type" / Enum(
-            BitsInteger(4),
-            OM_DEFAULT=0b0000,
-            OM_ODT_TYPE_16=0b0001,
-            OM_ODT_TYPE_32=0b0010,
-            OM_ODT_TYPE_64=0b0011,
-            OM_ODT_TYPE_ALIGNMENT=0b0100,
-            OM_MAX_ENTRY_SIZE=0b0101,
-        ),
-    ),
-)
+        self.GetSegmentInfoMode0Response = Struct(
+            Padding(3),
+            "basicInfo" / Int32,
+        )
 
-CurrentMode = BitStruct(
-    "resume" / Flag,
-    "running" / Flag,
-    "pid_off" / Flag,
-    "timestamp" / Flag,
-    Padding(2),
-    "direction" / Flag,
-    "selected" / Flag,
-)
+        self.GetSegmentInfoMode1Response = Struct(
+            "maxPages" / Int8,
+            "addressExtension" / Int8,
+            "maxMapping" / Int8,
+            "compressionMethod" / Int8,
+            "encryptionMethod" / Int8,
+        )
 
-GetDaqListModeResponse = Struct(
-    "currentMode" / CurrentMode,
-    Padding(2),
-    "currentEventChannel" / Int16ul,
-    "currentPrescaler" / Int8ul,
-    "currentPriority" / Int8ul,
-)
+        self.GetSegmentInfoMode2Response = Struct(
+            Padding(3),
+            "mappingInfo" / Int32,
+        )
 
-GetDaqClockResponse = Struct(
-    Padding(3),
-    "timestamp" / Int32ul,
-)
+        self.PageProperties = BitStruct(
+            Padding(2),
+            "xcpWriteAccessWithEcu" / Flag,
+            "xcpWriteAccessWithoutEcu" / Flag,
+            "xcpReadAccessWithEcu" / Flag,
+            "xcpReadAccessWithoutEcu" / Flag,
+            "ecuAccessWithXcp" / Flag,
+            "ecuAccessWithoutXcp" / Flag,
+        )
 
-DaqPackedMode = Enum(
-    Int8ul,
-    NONE=0,
-    ELEMENT_GROUPED=1,
-    EVENT_GROUPED=2
-)
+        self.DaqProperties = BitStruct(
+            "overloadEvent" / Flag,
+            "overloadMsb" / Flag,
+            "pidOffSupported" / Flag,
+            "timestampSupported" / Flag,
+            "bitStimSupported" / Flag,
+            "resumeSupported" / Flag,
+            "prescalerSupported" / Flag,
+            "daqConfigType" / Flag,
+        )
 
-GetDaqPackedModeResponse = Struct(
-    Padding(1),
-    "daqPackedMode" / DaqPackedMode,
-    "dpmTimestampMode" / If(
-        (this.daqPackedMode == "ELEMENT_GROUPED")
-        | (this.daqPackedMode == "EVENT_GROUPED"),
-        Int8ul
-    ),
-    "dpmSampleCount" / If(
-        (this.daqPackedMode == "ELEMENT_GROUPED")
-        | (this.daqPackedMode == "EVENT_GROUPED"),
-        Int16ul
-    )
-)
+        self.GetDaqProcessorInfoResponse = Struct(
+            "daqProperties" / self.DaqProperties,
+            "maxDaq" / Int16,
+            "maxEventChannel" / Int16,
+            "minDaq" / Int8,
+            "daqKeyByte" / BitStruct(
+                "Identification_Field" / Enum(
+                    BitsInteger(2),
+                    IDF_ABS_ODT_NUMBER=0b00,
+                    IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_BYTE=0b01,
+                    IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_WORD=0b10,
+                    IDF_REL_ODT_NUMBER_ABS_DAQ_LIST_NUMBER_WORD_ALIGNED=0b11,
+                ),
+                "Address_Extension" / Enum(
+                    BitsInteger(2),
+                    AE_DIFFERENT_WITHIN_ODT=0b00,
+                    AE_SAME_FOR_ALL_ODT=0b01,
+                    _NOT_ALLOWED=0b10,
+                    AE_SAME_FOR_ALL_DAQ=0b11,
+                ),
+                "Optimisation_Type" / Enum(
+                    BitsInteger(4),
+                    OM_DEFAULT=0b0000,
+                    OM_ODT_TYPE_16=0b0001,
+                    OM_ODT_TYPE_32=0b0010,
+                    OM_ODT_TYPE_64=0b0011,
+                    OM_ODT_TYPE_ALIGNMENT=0b0100,
+                    OM_MAX_ENTRY_SIZE=0b0101,
+                ),
+            ),
+        )
 
-ReadDaqResponse = Struct(
-    "bitOffset" / Int8ul,
-    "sizeofDaqElement" / Int8ul,
-    "adressExtension" / Int8ul,
-    "address" / Int32ul,
-)
+        self.CurrentMode = BitStruct(
+            "resume" / Flag,
+            "running" / Flag,
+            "pid_off" / Flag,
+            "timestamp" / Flag,
+            Padding(2),
+            "direction" / Flag,
+            "selected" / Flag,
+        )
 
-GetDaqResolutionInfoResponse = Struct(
-    "granularityOdtEntrySizeDaq" / Int8ul,
-    "maxOdtEntrySizeDaq" / Int8ul,
-    "granularityOdtEntrySizeStim" / Int8ul,
-    "maxOdtEntrySizeStim" / Int8ul,
-    "timestampMode" / BitStruct(  # Int8ul,
-        "unit" / Enum(
-            BitsInteger(4),
-            DAQ_TIMESTAMP_UNIT_1NS=0b0000,
-            DAQ_TIMESTAMP_UNIT_10NS=0b0001,
-            DAQ_TIMESTAMP_UNIT_100NS=0b0010,
-            DAQ_TIMESTAMP_UNIT_1US=0b0011,
-            DAQ_TIMESTAMP_UNIT_10US=0b0100,
-            DAQ_TIMESTAMP_UNIT_100US=0b0101,
-            DAQ_TIMESTAMP_UNIT_1MS=0b0110,
-            DAQ_TIMESTAMP_UNIT_10MS=0b0111,
-            DAQ_TIMESTAMP_UNIT_100MS=0b1000,
-            DAQ_TIMESTAMP_UNIT_1S=0b1001,
-            DAQ_TIMESTAMP_UNIT_1PS=0b1010,
-            DAQ_TIMESTAMP_UNIT_10PS=0b1011,
-            DAQ_TIMESTAMP_UNIT_100PS=0b1100,
-        ),
-        "fixed" / Flag,
-        "size" / Enum(
-            BitsInteger(3),
-            NO_TIME_STAMP=0b000,
-            S1=0b001,
-            S2=0b010,
-            NOT_ALLOWED=0b011,
-            S4=0b100,
-        ),
-    ),
-    "timestampTicks" / Int16ul,
-)
+        self.GetDaqListModeResponse = Struct(
+            "currentMode" / self.CurrentMode,
+            Padding(2),
+            "currentEventChannel" / Int16,
+            "currentPrescaler" / Int8,
+            "currentPriority" / Int8,
+        )
 
-DaqListProperties = BitStruct(
-    Padding(3),
-    "packed" / Flag,
-    "stim" / Flag,
-    "daq" / Flag,
-    "eventFixed" / Flag,
-    "predefined" / Flag,
-)
+        self.GetDaqClockResponse = Struct(
+            Padding(3),
+            "timestamp" / Int32,
+        )
 
-GetDaqListInfoResponse = Struct(
-    "daqListProperties" / DaqListProperties,
-    "maxOdt" / Int8ul,
-    "maxOdtEntries" / Int8ul,
-    "fixedEvent" / Int16ul,
-)
+        self.DaqPackedMode = Enum(
+            Int8,
+            NONE=0,
+            ELEMENT_GROUPED=1,
+            EVENT_GROUPED=2
+        )
 
-DaqEventProperties = BitStruct(
-    "consistency" / Enum(
-        BitsInteger(2),
-        CONSISTENCY_ODT=0b00,
-        CONSISTENCY_DAQ=0b01,
-        CONSISTENCY_EVENTCHANNEL=0b10,
-        CONSISTENCY_NONE=0b11,
-    ),
-    Padding(1),
-    "packed" / Flag,
-    "stim" / Flag,
-    "daq" / Flag,
-    Padding(2)
-)
+        self.GetDaqPackedModeResponse = Struct(
+            Padding(1),
+            "daqPackedMode" / self.DaqPackedMode,
+            "dpmTimestampMode" / If(
+                (this.daqPackedMode == "ELEMENT_GROUPED")
+                | (this.daqPackedMode == "EVENT_GROUPED"),
+                Int8
+            ),
+            "dpmSampleCount" / If(
+                (this.daqPackedMode == "ELEMENT_GROUPED")
+                | (this.daqPackedMode == "EVENT_GROUPED"),
+                Int16
+            )
+        )
 
-GetEventChannelInfoResponse = Struct(
-    "daqEventProperties" / DaqEventProperties,
-    "maxDaqList" / Int8ul,
-    "eventChannelNameLength" / Int8ul,
-    "eventChannelTimeCycle" / Int8ul,
-    "eventChannelTimeUnit" / Int8ul,
-    "eventChannelPriority" / Int8ul,
-)
+        self.ReadDaqResponse = Struct(
+            "bitOffset" / Int8,
+            "sizeofDaqElement" / Int8,
+            "adressExtension" / Int8,
+            "address" / Int32,
+        )
 
-CommModePgm = BitStruct(
-    Padding(1),
-    "slaveBlockMode" / Flag,
-    Padding(4),
-    "interleavedMode" / Flag,
-    "masterBlockMode" / Flag,
-)
+        self.GetDaqResolutionInfoResponse = Struct(
+            "granularityOdtEntrySizeDaq" / Int8,
+            "maxOdtEntrySizeDaq" / Int8,
+            "granularityOdtEntrySizeStim" / Int8,
+            "maxOdtEntrySizeStim" / Int8,
+            "timestampMode" / BitStruct(  # Int8,
+                "unit" / Enum(
+                    BitsInteger(4),
+                    DAQ_TIMESTAMP_UNIT_1NS=0b0000,
+                    DAQ_TIMESTAMP_UNIT_10NS=0b0001,
+                    DAQ_TIMESTAMP_UNIT_100NS=0b0010,
+                    DAQ_TIMESTAMP_UNIT_1US=0b0011,
+                    DAQ_TIMESTAMP_UNIT_10US=0b0100,
+                    DAQ_TIMESTAMP_UNIT_100US=0b0101,
+                    DAQ_TIMESTAMP_UNIT_1MS=0b0110,
+                    DAQ_TIMESTAMP_UNIT_10MS=0b0111,
+                    DAQ_TIMESTAMP_UNIT_100MS=0b1000,
+                    DAQ_TIMESTAMP_UNIT_1S=0b1001,
+                    DAQ_TIMESTAMP_UNIT_1PS=0b1010,
+                    DAQ_TIMESTAMP_UNIT_10PS=0b1011,
+                    DAQ_TIMESTAMP_UNIT_100PS=0b1100,
+                ),
+                "fixed" / Flag,
+                "size" / Enum(
+                    BitsInteger(3),
+                    NO_TIME_STAMP=0b000,
+                    S1=0b001,
+                    S2=0b010,
+                    NOT_ALLOWED=0b011,
+                    S4=0b100,
+                ),
+            ),
+            "timestampTicks" / Int16,
+        )
 
-ProgramStartResponse = Struct(
-    Padding(1),
-    "commModePgm" / CommModePgm,
-    "maxCtoPgm" / Int8ul,
-    "maxBsPgm" / Int8ul,
-    "minStPgm" / Int8ul,
-    "queueSizePgm" / Int8ul,
-)
+        self.DaqListProperties = BitStruct(
+            Padding(3),
+            "packed" / Flag,
+            "stim" / Flag,
+            "daq" / Flag,
+            "eventFixed" / Flag,
+            "predefined" / Flag,
+        )
 
-PgmProperties = BitStruct(
-    "nonSeqPgmRequired" / Flag,
-    "nonSeqPgmSupported" / Flag,
-    "encryptionRequired" / Flag,
-    "encryptionSupported" / Flag,
-    "compressionRequired" / Flag,
-    "compressionSupported" / Flag,
-    "functionalMode" / Flag,
-    "absoluteMode" / Flag
-)
+        self.GetDaqListInfoResponse = Struct(
+            "daqListProperties" / self.DaqListProperties,
+            "maxOdt" / Int8,
+            "maxOdtEntries" / Int8,
+            "fixedEvent" / Int16,
+        )
 
-GetPgmProcessorInfoResponse = Struct(
-    "pgmProperties" / PgmProperties,
-    "maxSector" / Int8ul
-)
+        self.DaqEventProperties = BitStruct(
+            "consistency" / Enum(
+                BitsInteger(2),
+                CONSISTENCY_ODT=0b00,
+                CONSISTENCY_DAQ=0b01,
+                CONSISTENCY_EVENTCHANNEL=0b10,
+                CONSISTENCY_NONE=0b11,
+            ),
+            Padding(1),
+            "packed" / Flag,
+            "stim" / Flag,
+            "daq" / Flag,
+            Padding(2)
+        )
 
-GetSectorInfoResponseMode01 = Struct(
-    "clearSequenceNumber" / Int8ul,
-    "programSequenceNumber" / Int8ul,
-    "programmingMethod" / Int8ul,
-    "sectorInfo" / Int32ul,
-)
+        self.GetEventChannelInfoResponse = Struct(
+            "daqEventProperties" / self.DaqEventProperties,
+            "maxDaqList" / Int8,
+            "eventChannelNameLength" / Int8,
+            "eventChannelTimeCycle" / Int8,
+            "eventChannelTimeUnit" / Int8,
+            "eventChannelPriority" / Int8,
+        )
 
-GetSectorInfoResponseMode2 = Struct(
-    "sectorNameLength" / Int8ul
-)
+        self.CommModePgm = BitStruct(
+            Padding(1),
+            "slaveBlockMode" / Flag,
+            Padding(4),
+            "interleavedMode" / Flag,
+            "masterBlockMode" / Flag,
+        )
+
+        self.ProgramStartResponse = Struct(
+            Padding(1),
+            "commModePgm" / self.CommModePgm,
+            "maxCtoPgm" / Int8,
+            "maxBsPgm" / Int8,
+            "minStPgm" / Int8,
+            "queueSizePgm" / Int8,
+        )
+
+        self.PgmProperties = BitStruct(
+            "nonSeqPgmRequired" / Flag,
+            "nonSeqPgmSupported" / Flag,
+            "encryptionRequired" / Flag,
+            "encryptionSupported" / Flag,
+            "compressionRequired" / Flag,
+            "compressionSupported" / Flag,
+            "functionalMode" / Flag,
+            "absoluteMode" / Flag
+        )
+
+        self.GetPgmProcessorInfoResponse = Struct(
+            "pgmProperties" / self.PgmProperties,
+            "maxSector" / Int8
+        )
+
+        self.GetSectorInfoResponseMode01 = Struct(
+            "clearSequenceNumber" / Int8,
+            "programSequenceNumber" / Int8,
+            "programmingMethod" / Int8,
+            "sectorInfo" / Int32,
+        )
+
+        self.GetSectorInfoResponseMode2 = Struct(
+            "sectorNameLength" / Int8
+        )

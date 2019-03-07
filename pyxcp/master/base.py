@@ -129,11 +129,13 @@ class MasterBaseType:
 
         """
         response = self.transport.request(types.Command.CONNECT, 0x00)
-        result = types.ConnectResponse.parse(response)
+        result = types.ConnectResponsePartial.parse(response)
+        byteOrder = result.commModeBasic.byteOrder
+        byteOrderPrefix = "<" if byteOrder == types.ByteOrder.INTEL else ">"
+        self.responses = types.Responses(byteOrder)
+        result = self.responses.ConnectResponse.parse(response)
         self.maxCto = result.maxCto
         self.maxDto = result.maxDto
-        byteOrderPrefix = "<" if result.commModeBasic.byteOrder == types.ByteOrder.INTEL else ">"
-
         self.WORD_pack = makeWordPacker(byteOrderPrefix)
         self.DWORD_pack = makeDWordPacker(byteOrderPrefix)
         self.WORD_unpack = makeWordUnpacker(byteOrderPrefix)
@@ -180,7 +182,7 @@ class MasterBaseType:
         `types.GetStatusResponse`
         """
         response = self.transport.request(types.Command.GET_STATUS)
-        result = types.GetStatusResponse.parse(response)
+        result = self.responses.GetStatusResponse.parse(response)
         return result
 
     @wrapped
@@ -201,7 +203,7 @@ class MasterBaseType:
         `pyxcp.types.GetCommModeInfoResponse`
         """
         response = self.transport.request(types.Command.GET_COMM_MODE_INFO)
-        result = types.GetCommModeInfoResponse.parse(response)
+        result = self.responses.GetCommModeInfoResponse.parse(response)
         return result
 
     @wrapped
@@ -228,7 +230,7 @@ class MasterBaseType:
         `pydbc.types.GetIDResponse`
         """
         response = self.transport.request(types.Command.GET_ID, mode)
-        result = types.GetIDResponse.parse(response)
+        result = self.responses.GetIDResponse.parse(response)
         result.length = self.DWORD_unpack(response[3:7])[0]
         return result
 
@@ -273,7 +275,7 @@ class MasterBaseType:
         """
         response = self.transport.request(
             types.Command.GET_SEED, first, resource)
-        return types.GetSeedResponse.parse(response)
+        return self.responses.GetSeedResponse.parse(response)
 
     @wrapped
     def unlock(self, length, key):
@@ -296,7 +298,7 @@ class MasterBaseType:
                   a Length containing the total length of the key.
         """
         response = self.transport.request(types.Command.UNLOCK, length, *key)
-        return types.ResourceType.parse(response)
+        return self.responses.ResourceType.parse(response)
 
     @wrapped
     def setMta(self, address, addressExt=0x00):
@@ -378,7 +380,7 @@ class MasterBaseType:
         bs = self.DWORD_pack(blocksize)
         response = self.transport.request(
             types.Command.BUILD_CHECKSUM, 0, 0, 0, *bs)
-        return types.BuildChecksumResponse.parse(response)
+        return self.responses.BuildChecksumResponse.parse(response)
 
     @wrapped
     def transportLayerCmd(self, subCommand, *data):
@@ -433,7 +435,7 @@ class MasterBaseType:
         """
 
         response = self.transport.request(types.Command.GET_VERSION)
-        result = types.GetVersionResponse.parse(response)
+        result = self.responses.GetVersionResponse.parse(response)
         return result
 
     def fetch(self, length, limitPayload=None):  # TODO: pull
@@ -555,7 +557,7 @@ class MasterBaseType:
         `pydbc.types.GetPagProcessorInfoResponse`
     """
         response = self.transport.request(types.Command.GET_PAG_PROCESSOR_INFO)
-        return types.GetPagProcessorInfoResponse.parse(response)
+        return self.responses.GetPagProcessorInfoResponse.parse(response)
 
     @wrapped
     def getSegmentInfo(self, mode, segmentNumber, segmentInfo, mappingIndex):
@@ -588,11 +590,11 @@ class MasterBaseType:
             types.Command.GET_SEGMENT_INFO, mode, segmentNumber, segmentInfo,
             mappingIndex)
         if mode == 0:
-            return types.GetSegmentInfoMode0Response.parse(response)
+            return self.responses.GetSegmentInfoMode0Response.parse(response)
         elif mode == 1:
-            return types.GetSegmentInfoMode1Response.parse(response)
+            return self.responses.GetSegmentInfoMode1Response.parse(response)
         elif mode == 2:
-            return types.GetSegmentInfoMode2Response.parse(response)
+            return self.responses.GetSegmentInfoMode2Response.parse(response)
 
     @wrapped
     def getPageInfo(self, segmentNumber, pageNumber):
@@ -605,7 +607,7 @@ class MasterBaseType:
         """
         response = self.transport.request(
             types.Command.GET_PAGE_INFO, 0, segmentNumber, pageNumber)
-        return (types.PageProperties.parse(bytes([response[0]])), response[1])
+        return (self.responses.PageProperties.parse(bytes([response[0]])), response[1])
 
     @wrapped
     def setSegmentMode(self, mode, segmentNumber):
@@ -696,7 +698,7 @@ class MasterBaseType:
         dln = self.WORD_pack(daqListNumber)
         response = self.transport.request(
             types.Command.GET_DAQ_LIST_MODE, 0, *dln)
-        return types.GetDaqListModeResponse.parse(response)
+        return self.responses.GetDaqListModeResponse.parse(response)
 
     @wrapped
     def startStopDaqList(self, mode, daqListNumber):
@@ -740,7 +742,7 @@ class MasterBaseType:
             Current timestamp, format specified by `getDaqResolutionInfo`
         """
         response = self.transport.request(types.Command.GET_DAQ_CLOCK)
-        result = types.GetDaqClockResponse.parse(response)
+        result = self.responses.GetDaqClockResponse.parse(response)
         return result.timestamp
 
     @wrapped
@@ -752,7 +754,7 @@ class MasterBaseType:
         `pyxcp.types.ReadDaqResponse`
         """
         response = self.transport.request(types.Command.READ_DAQ)
-        return types.ReadDaqResponse.parse(response)
+        return self.responses.ReadDaqResponse.parse(response)
 
     @wrapped
     def getDaqProcessorInfo(self):
@@ -763,7 +765,7 @@ class MasterBaseType:
         `pyxcp.types.GetDaqProcessorInfoResponse`
         """
         response = self.transport.request(types.Command.GET_DAQ_PROCESSOR_INFO)
-        return types.GetDaqProcessorInfoResponse.parse(response)
+        return self.responses.GetDaqProcessorInfoResponse.parse(response)
 
     @wrapped
     def getDaqResolutionInfo(self):
@@ -775,7 +777,7 @@ class MasterBaseType:
         """
         response = self.transport.request(
             types.Command.GET_DAQ_RESOLUTION_INFO)
-        return types.GetDaqResolutionInfoResponse.parse(response)
+        return self.responses.GetDaqResolutionInfoResponse.parse(response)
 
     @wrapped
     def getDaqListInfo(self, daqListNumber):
@@ -788,7 +790,7 @@ class MasterBaseType:
         dln = self.WORD_pack(daqListNumber)
         response = self.transport.request(
             types.Command.GET_DAQ_LIST_INFO, 0, *dln)
-        return types.GetDaqListInfoResponse.parse(response)
+        return self.responses.GetDaqListInfoResponse.parse(response)
 
     @wrapped
     def getDaqEventInfo(self, eventChannelNumber):
@@ -805,7 +807,7 @@ class MasterBaseType:
         ecn = self.WORD_pack(eventChannelNumber)
         response = self.transport.request(
             types.Command.GET_DAQ_EVENT_INFO, 0, *ecn)
-        return types.GetEventChannelInfoResponse.parse(response)
+        return self.responses.GetEventChannelInfoResponse.parse(response)
 
     @wrapped
     def setDaqPackedMode(
@@ -847,7 +849,7 @@ class MasterBaseType:
         dln = self.WORD_pack(daqListNumber)
         response = self.transport.request(
             types.Command.GET_DAQ_PACKED_MODE, *dln)
-        result = types.GetDaqPackedModeResponse.parse(response)
+        result = self.responses.GetDaqPackedModeResponse.parse(response)
         return result
 
     # dynamic
@@ -881,7 +883,7 @@ class MasterBaseType:
         `pyxcp.types.ProgramStartResponse`
         """
         response = self.transport.request(types.Command.PROGRAM_START)
-        return types.ProgramStartResponse.parse(response)
+        return self.responses.ProgramStartResponse.parse(response)
 
     @wrapped
     def programClear(self, mode, clearRange):
@@ -920,16 +922,16 @@ class MasterBaseType:
     def getPgmProcessorInfo(self):
         """Get general information on PGM processor."""
         response = self.transport.request(types.Command.GET_PGM_PROCESSOR_INFO)
-        return types.GetPgmProcessorInfoResponse.parse(response)
+        return self.responses.GetPgmProcessorInfoResponse.parse(response)
 
     def getSectorInfo(self, mode, sectorNumber):
         """Get specific information for a sector."""
         response = self.transport.request(
             types.Command.GET_SECTOR_INFO, mode, sectorNumber)
         if mode == 0 or mode == 1:
-            return types.GetSectorInfoResponseMode01.parse(response)
+            return self.responses.GetSectorInfoResponseMode01.parse(response)
         elif mode == 2:
-            return types.GetSectorInfoResponseMode2.parse(response)
+            return self.responses.GetSectorInfoResponseMode2.parse(response)
 
     def programPrepare(self, codesize):
         """Prepare non-volatile memory programming."""
